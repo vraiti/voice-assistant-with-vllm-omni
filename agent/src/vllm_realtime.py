@@ -168,6 +168,8 @@ class VLLMRealtimeSession(RealtimeSession):
         self._full_transcript = ""
         self._audio_chunks_sent = 0
         self._resampler: rtc.AudioResampler | None = None
+        self._turn_start: float = 0.0
+        self._ttfa_log: list[float] = []
 
     @property
     def chat_ctx(self) -> ChatContext:
@@ -223,6 +225,7 @@ class VLLMRealtimeSession(RealtimeSession):
         return fut
 
     def commit_audio(self) -> None:
+        self._turn_start = time.monotonic()
         logger.info("Committing audio buffer (%d chunks sent)", self._audio_chunks_sent)
         self._send_queue.put_nowait({
             "type": "input_audio_buffer.commit",
@@ -371,6 +374,10 @@ class VLLMRealtimeSession(RealtimeSession):
             )
 
             if self._current_audio_stream is None:
+                if self._turn_start:
+                    ttfa = time.monotonic() - self._turn_start
+                    self._ttfa_log.append(ttfa)
+                    logger.info("TTFA turn %d: %.3fs", len(self._ttfa_log), ttfa)
                 self._start_generation()
 
             if self._current_audio_stream:
@@ -437,6 +444,13 @@ class VLLMRealtimeSession(RealtimeSession):
             self._current_audio_stream = None
 
     async def aclose(self) -> None:
+        if self._ttfa_log:
+            avg = sum(self._ttfa_log) / len(self._ttfa_log)
+            logger.info(
+                "Session TTFA summary: %d turns, avg=%.3fs, min=%.3fs, max=%.3fs, all=%s",
+                len(self._ttfa_log), avg, min(self._ttfa_log), max(self._ttfa_log),
+                ["%.3f" % t for t in self._ttfa_log],
+            )
         self._closed = True
         self._finish_generation()
         if self._main_task:
