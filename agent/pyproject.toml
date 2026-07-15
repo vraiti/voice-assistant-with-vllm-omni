@@ -9,6 +9,7 @@ description = "Voice assistant LiveKit agent using vLLM-Omni with Qwen3-Omni"
 requires-python = ">=3.10"
 dependencies = [
     "livekit-agents[openai]~=1.5",
+    "livekit-plugins-silero",
     "python-dotenv",
 ]
 
