@@ -178,6 +178,8 @@ class VLLMRealtimeSession(RealtimeSession):
         self._current_audio_stream: _AudioStream | None = None
         self._current_text_stream: _TextStream | None = None
         self._generation_task: asyncio.Task | None = None
+        self._turn_start: float = 0.0
+        self._ttfa_log: list[float] = []
 
     @property
     def chat_ctx(self) -> ChatContext:
@@ -257,6 +259,7 @@ class VLLMRealtimeSession(RealtimeSession):
                 fut.set_exception(RuntimeError("No audio to process"))
             return
 
+        self._turn_start = time.monotonic()
         logger.info("Generating reply from %d audio frames", len(frames))
 
         # PoC: conversation history grows unbounded (including base64 audio).
@@ -306,6 +309,7 @@ class VLLMRealtimeSession(RealtimeSession):
 
         assistant_text = ""
         try:
+            first_audio = True
             stream = await self._client.chat.completions.create(
                 model=self._model._model_name,
                 modalities=["text", "audio"],
@@ -325,6 +329,11 @@ class VLLMRealtimeSession(RealtimeSession):
                     if modality == "audio":
                         frame = _wav_bytes_to_frame(base64.b64decode(content))
                         if frame and self._current_audio_stream:
+                            if first_audio:
+                                ttfa = time.monotonic() - self._turn_start
+                                self._ttfa_log.append(ttfa)
+                                logger.info("TTFA turn %d: %.3fs", len(self._ttfa_log), ttfa)
+                                first_audio = False
                             self._current_audio_stream.push(frame)
                     else:
                         assistant_text += content
@@ -354,6 +363,13 @@ class VLLMRealtimeSession(RealtimeSession):
             self._current_audio_stream = None
 
     async def aclose(self) -> None:
+        if self._ttfa_log:
+            avg = sum(self._ttfa_log) / len(self._ttfa_log)
+            logger.info(
+                "Session TTFA summary: %d turns, avg=%.3fs, min=%.3fs, max=%.3fs, all=%s",
+                len(self._ttfa_log), avg, min(self._ttfa_log), max(self._ttfa_log),
+                ["%.3f" % t for t in self._ttfa_log],
+            )
         self._closed = True
         if self._generation_task and not self._generation_task.done():
             self._generation_task.cancel()
