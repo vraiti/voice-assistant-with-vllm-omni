@@ -219,7 +219,6 @@ class VLLMRealtimeSession(RealtimeSession):
         tools: NotGivenOr[list[Tool]] = NOT_GIVEN,
     ) -> asyncio.Future[GenerationCreatedEvent]:
         self._ensure_connected()
-        self.commit_audio()
         fut: asyncio.Future[GenerationCreatedEvent] = asyncio.get_event_loop().create_future()
         self._generation_future = fut
         return fut
