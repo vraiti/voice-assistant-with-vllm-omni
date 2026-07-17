@@ -4,8 +4,7 @@ import os
 from dotenv import load_dotenv
 from livekit.agents import Agent, AgentServer, AgentSession, AutoSubscribe, JobContext, cli
 from livekit.plugins import silero
-
-from vllm_realtime import VLLMRealtimeModel
+from livekit.plugins.openai.realtime import RealtimeModel
 
 load_dotenv(".env.local")
 logger = logging.getLogger("voice-assistant")
@@ -24,9 +23,11 @@ class VoiceAssistant(Agent):
 
 @server.rtc_session(agent_name="voice-assistant")
 async def entrypoint(ctx: JobContext):
-    model = VLLMRealtimeModel(
+    model = RealtimeModel(
         base_url=VLLM_BASE_URL,
         model="Qwen/Qwen3-Omni-30B-A3B-Instruct",
+        api_key="unused",
+        turn_detection=None,
     )
 
     session = AgentSession(
