@@ -30,6 +30,8 @@ async def entrypoint(ctx: JobContext):
         turn_detection=None,
     )
 
+    await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
+
     session = AgentSession(
         llm=model,
         vad=silero.VAD.load(),
@@ -39,7 +41,6 @@ async def entrypoint(ctx: JobContext):
         agent=VoiceAssistant(),
         room=ctx.room,
     )
-    await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
     logger.info("Voice assistant started, connected to vLLM-Omni at %s", VLLM_BASE_URL)
 
