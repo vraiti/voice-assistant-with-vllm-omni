@@ -34,7 +34,7 @@ async def entrypoint(ctx: JobContext):
 
     session = AgentSession(
         llm=model,
-        vad=silero.VAD.load(),
+        vad=silero.VAD.load(min_silence_duration=0.5),
         turn_detection="vad",
     )
     await session.start(

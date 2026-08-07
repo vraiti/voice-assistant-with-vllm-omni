@@ -43,6 +43,7 @@ function UserMicIndicator() {
 
 function AgentVisualizer() {
   const { state, audioTrack } = useVoiceAssistant();
+  const displayState = state === "thinking" ? "generating" : state;
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -52,7 +53,7 @@ function AgentVisualizer() {
       <div className="h-32 w-48">
         <BarVisualizer state={state} barCount={5} track={audioTrack} />
       </div>
-      <p className="text-sm text-zinc-400 capitalize">{state}</p>
+      <p className="text-sm text-zinc-400 capitalize">{displayState}</p>
     </div>
   );
 }
