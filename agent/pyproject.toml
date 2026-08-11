@@ -11,6 +11,7 @@ dependencies = [
     "livekit-agents[openai]~=1.5",
     "livekit-plugins-silero",
     "python-dotenv",
+    "httpx",
 ]
 
 [tool.setuptools.packages.find]

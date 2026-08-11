@@ -1,7 +1,7 @@
 import { AccessToken, RoomAgentDispatch, RoomConfiguration } from "livekit-server-sdk";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   const apiKey = process.env.LIVEKIT_API_KEY;
   const apiSecret = process.env.LIVEKIT_API_SECRET;
   const serverUrl = process.env.LIVEKIT_URL;
@@ -11,6 +11,16 @@ export async function POST() {
       { error: "LiveKit credentials not configured" },
       { status: 500 }
     );
+  }
+
+  let vadMode = "client";
+  try {
+    const body = await req.json();
+    if (body.vad_mode === "semantic" || body.vad_mode === "client") {
+      vadMode = body.vad_mode;
+    }
+  } catch {
+    // no body or invalid JSON — use default
   }
 
   const roomName = `voice-room-${Math.random().toString(36).slice(2, 9)}`;
@@ -30,6 +40,7 @@ export async function POST() {
 
   at.roomConfig = new RoomConfiguration({
     agents: [new RoomAgentDispatch({ agentName: "voice-assistant" })],
+    metadata: JSON.stringify({ vad_mode: vadMode }),
   });
 
   const token = await at.toJwt();
