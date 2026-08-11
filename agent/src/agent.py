@@ -11,7 +11,7 @@ from livekit.plugins.openai.realtime import RealtimeModel
 load_dotenv(".env.local")
 logger = logging.getLogger("voice-assistant")
 
-VLLM_BASE_URL = os.getenv("VLLM_BASE_URL", "http://localhost:8091/v1")
+VLLM_BASE_URL = os.getenv("VLLM_BASE_URL", "http://localhost:9090/v1")
 
 server = AgentServer()
 
