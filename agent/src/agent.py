@@ -5,6 +5,7 @@ import os
 import httpx
 from dotenv import load_dotenv
 from livekit.agents import Agent, AgentServer, AgentSession, AutoSubscribe, JobContext, cli
+from livekit.agents.metrics import RealtimeModelMetrics
 from livekit.plugins import silero
 from livekit.plugins.openai.realtime import RealtimeModel
 
@@ -34,6 +35,22 @@ async def _get_model_name() -> str:
     model_id = models[0]["id"]
     logger.info("Using model: %s", model_id)
     return model_id
+
+
+def _on_metrics_collected(event) -> None:
+    metrics = event.metrics
+    if not isinstance(metrics, RealtimeModelMetrics):
+        return
+    if metrics.ttft >= 0:
+        logger.info(
+            "TTFA %.3fs (request_id=%s, duration=%.3fs, cancelled=%s)",
+            metrics.ttft, metrics.request_id, metrics.duration, metrics.cancelled,
+        )
+    else:
+        logger.info(
+            "No audio token received (request_id=%s, duration=%.3fs, cancelled=%s)",
+            metrics.request_id, metrics.duration, metrics.cancelled,
+        )
 
 
 def _get_vad_mode(ctx: JobContext) -> str:
@@ -76,6 +93,8 @@ async def entrypoint(ctx: JobContext):
             vad=silero.VAD.load(min_silence_duration=0.5),
             turn_detection="vad",
         )
+
+    session.on("metrics_collected", _on_metrics_collected)
 
     await session.start(
         agent=VoiceAssistant(),
