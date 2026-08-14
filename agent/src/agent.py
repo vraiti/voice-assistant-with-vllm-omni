@@ -1,12 +1,18 @@
-import json
 import logging
 import os
 
 import httpx
 from dotenv import load_dotenv
-from livekit.agents import Agent, AgentServer, AgentSession, AutoSubscribe, JobContext, cli
+from livekit.agents import (
+    Agent,
+    AgentServer,
+    AgentSession,
+    JobContext,
+    cli,
+    TurnHandlingOptions,
+    inference,
+)
 from livekit.agents.metrics import RealtimeModelMetrics
-from livekit.plugins import silero
 from livekit.plugins.openai.realtime import RealtimeModel
 
 load_dotenv(".env.local")
@@ -44,55 +50,36 @@ def _on_metrics_collected(event) -> None:
     if metrics.ttft >= 0:
         logger.info(
             "TTFA %.3fs (request_id=%s, duration=%.3fs, cancelled=%s)",
-            metrics.ttft, metrics.request_id, metrics.duration, metrics.cancelled,
+            metrics.ttft,
+            metrics.request_id,
+            metrics.duration,
+            metrics.cancelled,
         )
     else:
         logger.info(
             "No audio token received (request_id=%s, duration=%.3fs, cancelled=%s)",
-            metrics.request_id, metrics.duration, metrics.cancelled,
+            metrics.request_id,
+            metrics.duration,
+            metrics.cancelled,
         )
-
-
-def _get_vad_mode(ctx: JobContext) -> str:
-    metadata = ctx.room.metadata
-    if metadata:
-        try:
-            data = json.loads(metadata)
-            mode = data.get("vad_mode", "client")
-            if mode in ("client", "semantic"):
-                return mode
-        except (json.JSONDecodeError, AttributeError):
-            pass
-    return "client"
 
 
 @server.rtc_session(agent_name="voice-assistant")
 async def entrypoint(ctx: JobContext):
-    await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
-
     model_name = await _get_model_name()
-    vad_mode = _get_vad_mode(ctx)
-    logger.info("VAD mode: %s", vad_mode)
 
-    if vad_mode == "semantic":
-        model = RealtimeModel(
-            base_url=VLLM_BASE_URL,
-            model=model_name,
-            api_key="unused",
-        )
-        session = AgentSession(llm=model)
-    else:
-        model = RealtimeModel(
-            base_url=VLLM_BASE_URL,
-            model=model_name,
-            api_key="unused",
-            turn_detection=None,
-        )
-        session = AgentSession(
-            llm=model,
-            vad=silero.VAD.load(min_silence_duration=0.5),
-            turn_detection="vad",
-        )
+    model = RealtimeModel(
+        base_url=VLLM_BASE_URL,
+        model=model_name,
+        api_key="unused",
+    )
+
+    session = AgentSession(
+        llm=model,
+        turn_handling=TurnHandlingOptions(
+            turn_detection=inference.TurnDetector(),
+        ),
+    )
 
     session.on("metrics_collected", _on_metrics_collected)
 
@@ -101,7 +88,11 @@ async def entrypoint(ctx: JobContext):
         room=ctx.room,
     )
 
-    logger.info("Voice assistant started (vad=%s, model=%s), connected to vLLM-Omni at %s", vad_mode, model_name, VLLM_BASE_URL)
+    logger.info(
+        "Voice assistant started (vad=%s, model=%s), connected to vLLM-Omni at %s",
+        model_name,
+        VLLM_BASE_URL,
+    )
 
 
 if __name__ == "__main__":
