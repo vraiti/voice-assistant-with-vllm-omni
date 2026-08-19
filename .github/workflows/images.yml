@@ -20,8 +20,6 @@ jobs:
     strategy:
       matrix:
         image:
-          - name: frontend
-            context: frontend
           - name: agent
             context: agent
     steps:
